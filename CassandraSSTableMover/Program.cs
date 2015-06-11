@@ -68,7 +68,7 @@ namespace CassandraSSTableMover
                 output.WriteLine(@"mkdir ""{0}""", directory.Replace(sourceDirectory, targetDirectory));
         }
 
-        private static readonly Regex regex = new Regex(@"(?<sstablekey>[\w\d\-]+?\-ic\-\d+?)\-.*");
+        private static readonly Regex regex = new Regex(@"(?<sstablekey>[\w\d\-]+?\-(ic|jb)\-\d+?)\-.*");
     }
 
     public class SSTableSizeComparer : IComparer<SSTable>
