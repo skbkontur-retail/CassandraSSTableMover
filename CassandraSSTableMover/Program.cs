@@ -12,7 +12,8 @@ namespace CassandraSSTableMover
         {
             var directory1 = Path.GetFullPath(args[0]);
             var directory2 = Path.GetFullPath(args[1]);
-            var targetDirectory = Path.GetFullPath(args[2]);
+            var directory3 = Path.GetFullPath(args[2]);
+            var targetDirectory = Path.GetFullPath(args[3]);
 
             var sstableFiles1 =
                 Directory
@@ -34,10 +35,25 @@ namespace CassandraSSTableMover
                     })
                     .ToArray();
 
+            var sstableFiles3 =
+                Directory
+                    .EnumerateFiles(directory3, "*", SearchOption.AllDirectories)
+                    .Select(x => new
+                    {
+                        Match = regex.Match(x),
+                        FileName = x
+                    })
+                    .ToArray();
+
             var notMatched = sstableFiles1.Where(x => !x.Match.Success);
             Console.WriteLine("Not matched: ");
             notMatched.Select(x => x.FileName).ToList().ForEach(Console.WriteLine);
+
             notMatched = sstableFiles2.Where(x => !x.Match.Success);
+            Console.WriteLine("Not matched: ");
+            notMatched.Select(x => x.FileName).ToList().ForEach(Console.WriteLine);
+
+            notMatched = sstableFiles3.Where(x => !x.Match.Success);
             Console.WriteLine("Not matched: ");
             notMatched.Select(x => x.FileName).ToList().ForEach(Console.WriteLine);
 
@@ -55,37 +71,54 @@ namespace CassandraSSTableMover
                     Key = x.Match.Groups["sstablekey"].Captures[0].Value, x.FileName
                 })
                 .ToArray();
+            var matched3 = sstableFiles3
+                .Where(x => x.Match.Success)
+                .Select(x => new
+                {
+                    Key = x.Match.Groups["sstablekey"].Captures[0].Value, x.FileName
+                })
+                .ToArray();
 
             var sstables1 = matched1.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
             var sstables2 = matched2.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
+            var sstables3 = matched3.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
 
-            var factor1 = CalculateFactor(sstables1.Sum(x => x.Size), sstables2.Sum(x => x.Size));
+            var factor1 = CalculateFactor(sstables1.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables3.Sum(x => x.Size));
             var from1ToTarget = new List<SSTable>();
             var stayIn1 = new List<SSTable>();
             Console.WriteLine("Factor1: {0}", factor1);
             MegaSplit(sstables1, from1ToTarget, stayIn1, factor1);
 
-            var factor2 = CalculateFactor(sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size));
+            var factor2 = CalculateFactor(sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size), sstables3.Sum(x => x.Size));
             Console.WriteLine("Factor2: {0}", factor2);
             var from2ToTarget = new List<SSTable>();
             var stayIn2 = new List<SSTable>();
             MegaSplit(sstables2, from2ToTarget, stayIn2, factor2);
 
+            var factor3 = CalculateFactor(sstables3.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size));
+            Console.WriteLine("Factor3: {0}", factor3);
+            var from3ToTarget = new List<SSTable>();
+            var stayIn3 = new List<SSTable>();
+            MegaSplit(sstables3, from3ToTarget, stayIn3, factor3);
+
 
             Console.WriteLine("Source1 size: {0}", stayIn1.Select(x => x.Size).Sum());
             Console.WriteLine("Source2 size: {0}", stayIn2.Select(x => x.Size).Sum());
-            Console.WriteLine("Target size: {0}", from1ToTarget.Sum(x => x.Size) + from2ToTarget.Sum(x => x.Size));
+            Console.WriteLine("Source3 size: {0}", stayIn3.Select(x => x.Size).Sum());
+            Console.WriteLine("Target size: {0}", from1ToTarget.Sum(x => x.Size) + from2ToTarget.Sum(x => x.Size) + from3ToTarget.Sum(x => x.Size));
 
             WriteMakeDirectoryStatements(directory1, targetDirectory, Console.Out);
             WriteMakeDirectoryStatements(directory2, targetDirectory, Console.Out);
+            WriteMakeDirectoryStatements(directory3, targetDirectory, Console.Out);
 
             WriteMoveSSTablesStatements(from1ToTarget, directory1, targetDirectory, Console.Out);
             WriteMoveSSTablesStatements(from2ToTarget, directory2, targetDirectory, Console.Out);
+            WriteMoveSSTablesStatements(from3ToTarget, directory3, targetDirectory, Console.Out);
         }
 
-        private static double CalculateFactor(double x, double y)
+        private static double CalculateFactor(double x, double y, double z)
         {
-            return (x + y) / (2 * x - y);
+            return (x + y + z) / (3 * x - y - z);
         }
 
         private static void WriteMoveSSTablesStatements(List<SSTable> sstableList, string directory, string targetDirectory, TextWriter output)
