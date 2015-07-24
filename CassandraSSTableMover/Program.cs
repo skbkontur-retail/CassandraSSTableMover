@@ -100,7 +100,7 @@ namespace CassandraSSTableMover
                 output.WriteLine(@"mkdir ""{0}""", directory.Replace(sourceDirectory, targetDirectory));
         }
 
-        private static readonly Regex regex = new Regex(@"(?<sstablekey>[\w\d\-]+?\-ic\-\d+?)\-.*");
+        private static readonly Regex regex = new Regex(@"(?<sstablekey>[\w\d\-]+?\-(ic|jb)\-\d+?)\-.*");
 
         private static void MegaSplit(SSTable[] source, List<SSTable> target2, List<SSTable> target1, double factor)
         {
