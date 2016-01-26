@@ -135,15 +135,47 @@ namespace CassandraSSTableMover
 
         private static readonly Regex regex = new Regex(@"(?<sstablekey>[\w\d\-]+?\-(ic|jb)\-\d+?)\-.*");
 
+        static Random _random = new Random();
+
+        static void Shuffle<T>(T[] array)
+        {
+	        int n = array.Length;
+	        for (int i = 0; i < n; i++)
+	        {
+	            int r = i + (int)(_random.NextDouble() * (n - i));
+	            T t = array[r];
+	            array[r] = array[i];
+	            array[i] = t;
+	        }
+        }
+
         private static void MegaSplit(SSTable[] source, List<SSTable> target2, List<SSTable> target1, double factor)
         {
-            foreach(var sstable in source.OrderByDescending(x => x.Size))
+            List<SSTable> tempTarget2 = new List<SSTable>(); 
+            List<SSTable > tempTarget1 = new List<SSTable>(); 
+            var previousFactor = 100000000.0;
+            for (var i = 0; i < 1; i++)
             {
-                if(target2.Select(x => x.Size).Sum() == 0 || (target1.Select(x => x.Size).Sum() / (double)target2.Select(x => x.Size).Sum()) > factor)
-                    target2.Add(sstable);
-                else
-                    target1.Add(sstable);
+                Shuffle(source);
+                foreach(var sstable in source)
+                {
+                    if(tempTarget2.Select(x => x.Size).Sum() == 0 || (tempTarget1.Select(x => x.Size).Sum() / (double)tempTarget2.Select(x => x.Size).Sum()) > factor)
+                        tempTarget2.Add(sstable);
+                    else
+                        tempTarget1.Add(sstable);
+                }
+                if (Math.Abs(factor - previousFactor) > Math.Abs(factor - (tempTarget1.Select(x => x.Size).Sum()/(double) tempTarget2.Select(x => x.Size).Sum())))
+                {
+                    target2.Clear();
+                    target2.AddRange(tempTarget2);
+                    target1.Clear();
+                    target1.AddRange(tempTarget1);
+                    previousFactor = (tempTarget1.Select(x => x.Size).Sum()/(double) tempTarget2.Select(x => x.Size).Sum());
+                }
+                tempTarget2.Clear();
+                tempTarget1.Clear();
             }
+
 
         }
     }
