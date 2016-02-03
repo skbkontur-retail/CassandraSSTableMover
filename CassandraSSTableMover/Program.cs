@@ -82,20 +82,21 @@ namespace CassandraSSTableMover
             var sstables1 = matched1.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
             var sstables2 = matched2.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
             var sstables3 = matched3.GroupBy(x => x.Key).Select(x => new SSTable(x.Select(z => z.FileName).ToArray())).ToArray();
+            var targetDiskSpaceUsage = (double)(new DriveInfo(Path.GetPathRoot(targetDirectory).Substring(0, 1)).TotalSize - new DriveInfo(Path.GetPathRoot(targetDirectory).Substring(0, 1)).AvailableFreeSpace);
 
-            var factor1 = CalculateFactor(sstables1.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables3.Sum(x => x.Size));
+            var factor1 = CalculateFactor(sstables1.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables3.Sum(x => x.Size), targetDiskSpaceUsage);
             var from1ToTarget = new List<SSTable>();
             var stayIn1 = new List<SSTable>();
             Console.WriteLine("Factor1: {0}", factor1);
             MegaSplit(sstables1, from1ToTarget, stayIn1, factor1);
 
-            var factor2 = CalculateFactor(sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size), sstables3.Sum(x => x.Size));
+            var factor2 = CalculateFactor(sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size), sstables3.Sum(x => x.Size), targetDiskSpaceUsage);
             Console.WriteLine("Factor2: {0}", factor2);
             var from2ToTarget = new List<SSTable>();
             var stayIn2 = new List<SSTable>();
             MegaSplit(sstables2, from2ToTarget, stayIn2, factor2);
 
-            var factor3 = CalculateFactor(sstables3.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size));
+            var factor3 = CalculateFactor(sstables3.Sum(x => x.Size), sstables2.Sum(x => x.Size), sstables1.Sum(x => x.Size), targetDiskSpaceUsage);
             Console.WriteLine("Factor3: {0}", factor3);
             var from3ToTarget = new List<SSTable>();
             var stayIn3 = new List<SSTable>();
@@ -116,9 +117,9 @@ namespace CassandraSSTableMover
             WriteMoveSSTablesStatements(from3ToTarget, directory3, targetDirectory, Console.Out);
         }
 
-        private static double CalculateFactor(double x, double y, double z)
+        private static double CalculateFactor(double x, double y, double z, double t)
         {
-            return (x + y + z) / (3 * x - y - z);
+            return (x + y + z + t) / (3 * x - y - z - t);
         }
 
         private static void WriteMoveSSTablesStatements(List<SSTable> sstableList, string directory, string targetDirectory, TextWriter output)
